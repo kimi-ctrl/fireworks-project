@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>丰富功能和声音的炫酷烟花</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: black;
+            color: white;
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+        canvas {
+            display: block;
+        }
+        #startButton {
+            position: absolute;
+            top: 60%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 20px 40px;
+            font-size: 18px;
+            color: white;
+            background-color: #007bff;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            z-index: 1000;
+        }
+        #welcomeMessage {
+            position: absolute;
+            top: 20%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            line-height: 1.5;
+            z-index: 1000;
+        }
+        #instruction {
+            position: absolute;
+            bottom: 10%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 16px;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div id="welcomeMessage">
+        ✨ 新年快乐！<br>
+        愿你的 <strong>2025年</strong>，<br>
+        像烟花般灿烂夺目，<br>
+        像繁星般温暖明亮，<br>
+        每一天都充满希望与喜悦！<br>
+        一起迎接崭新的开始吧！ 🎆
+    </div>
+    <button id="startButton">点我进入放烟花界面</button>
+    <div id="instruction" style="display: none;">点屏幕开始放烟花</div>
+    <canvas id="fireworkCanvas"></canvas>
+    <script>
+        const canvas = document.getElementById("fireworkCanvas");
+        const ctx = canvas.getContext("2d");
+        const startButton = document.getElementById("startButton");
+        const welcomeMessage = document.getElementById("welcomeMessage");
+        const instruction = document.getElementById("instruction");
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const fireworks = [];
+        const particles = [];
+
+        // 爆炸音效
+        const explodeSound = new Audio("fireworks-29629.mp3");
+
+        let soundEnabled = false;
+
+        // 定义多种颜色
+        const colorPalette = [
+            "255, 99, 71",  // 番茄红
+            "135, 206, 250", // 天蓝色
+            "255, 215, 0",   // 金色
+            "124, 252, 0",   // 草绿色
+            "138, 43, 226",  // 蓝紫色
+            "255, 105, 180", // 热粉色
+            "30, 144, 255",  // 道奇蓝
+        ];
+
+        class Firework {
+            constructor(x, y, targetX, targetY, type = "circle") {
+                this.x = x;
+                this.y = y;
+                this.targetX = targetX;
+                this.targetY = targetY;
+                this.speed = 5;
+                this.angle = Math.atan2(targetY - y, targetX - x);
+                this.exploded = false;
+                this.type = type;
+            }
+
+            update() {
+                if (!this.exploded) {
+                    const dx = Math.cos(this.angle) * this.speed;
+                    const dy = Math.sin(this.angle) * this.speed;
+                    this.x += dx;
+                    this.y += dy;
+
+                    // 绘制拖尾特效
+                    particles.push(
+                        new Particle(
+                            this.x,
+                            this.y,
+                            Math.random() * 0.5 - 0.25,
+                            Math.random() * 0.5 - 0.25,
+                            "255, 255, 255",
+                            2
+                        )
+                    );
+
+                    if (Math.hypot(this.targetX - this.x, this.targetY - this.y) < 10) {
+                        this.explode();
+                    }
+                }
+            }
+
+            explode() {
+                this.exploded = true;
+                if (soundEnabled) {
+                    explodeSound.currentTime = 0;
+                    explodeSound.play().catch(err => console.error("爆炸音效播放失败：", err));
+                }
+
+                const particleCount = 400; // 粒子数量增加
+                if (this.type === "circle") {
+                    for (let i = 0; i < particleCount; i++) {
+                        const angle = Math.random() * Math.PI * 2;
+                        const speed = Math.random() * 5 + 2;
+                        const color = colorPalette[Math.floor(Math.random() * colorPalette.length)];
+                        particles.push(
+                            new Particle(
+                                this.targetX,
+                                this.targetY,
+                                Math.cos(angle) * speed,
+                                Math.sin(angle) * speed,
+                                color,
+                                Math.random() * 3 + 1
+                            )
+                        );
+                    }
+                } else if (this.type === "heart") {
+                    addHeartFirework(this.targetX, this.targetY);
+                }
+            }
+
+            draw() {
+                if (!this.exploded) {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, 5, 0, Math.PI * 2);
+                    ctx.fillStyle = "white";
+                    ctx.fill();
+                }
+            }
+        }
+
+        class Particle {
+            constructor(x, y, vx, vy, color, size) {
+                this.x = x;
+                this.y = y;
+                this.vx = vx;
+                this.vy = vy;
+                this.color = color;
+                this.size = size;
+                this.alpha = 1; // 初始透明度
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vy += 0.02; // 模拟重力
+                this.alpha -= 0.01; // 粒子逐渐消失
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(${this.color}, ${this.alpha})`;
+                ctx.fill();
+            }
+        }
+
+        function addHeartFirework(x, y) {
+            const particleCount = 200;
+            for (let t = 0; t < Math.PI * 2; t += Math.PI / particleCount) {
+                const posX = 16 * Math.pow(Math.sin(t), 3);
+                const posY = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
+                const color = colorPalette[Math.floor(Math.random() * colorPalette.length)];
+                particles.push(
+                    new Particle(
+                        x + posX * 10,
+                        y + posY * 10,
+                        Math.random() * 2 - 1,
+                        Math.random() * 2 - 1,
+                        color,
+                        Math.random() * 3 + 1
+                    )
+                );
+            }
+        }
+
+        function addFirework(x, y) {
+            const types = ["circle", "heart"];
+            const randomType = types[Math.floor(Math.random() * types.length)];
+            fireworks.push(new Firework(canvas.width / 2, canvas.height - 60, x, y, randomType));
+        }
+
+        function animate() {
+            ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            fireworks.forEach((firework, i) => {
+                firework.update();
+                firework.draw();
+                if (firework.exploded) fireworks.splice(i, 1);
+            });
+
+            particles.forEach((particle, i) => {
+                particle.update();
+                particle.draw();
+                if (particle.alpha <= 0) particles.splice(i, 1);
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        startButton.addEventListener("click", () => {
+            soundEnabled = true;
+            startButton.style.display = "none";
+            welcomeMessage.style.display = "none";
+            instruction.style.display = "block";
+            animate();
+        });
+
+        // 点击屏幕释放随机爱心或普通烟花功能，从底部发射到目标位置
+        canvas.addEventListener("click", (event) => {
+            const x = event.clientX;
+            const y = event.clientY;
+            addFirework(x, y);
+        });
+    </script>
+</body>
+</html>
